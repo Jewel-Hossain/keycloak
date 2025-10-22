@@ -1,0 +1,40 @@
+@model IEnumerable<FoodiApp.Models.Order>
+
+@{
+    ViewData["Title"] = "My Orders";
+}
+
+<div class="container">
+    <div class="page-header">
+        <h1 class="page-title">My Orders 📦</h1>
+        <p class="page-subtitle">Track your order history</p>
+    </div>
+
+    @if (Model != null && Model.Any())
+    {
+        <div class="orders-list">
+            @foreach (var order in Model)
+            {
+                <div class="order-card">
+                    <div class="order-header">
+                        <h3>Order #@order.Id</h3>
+                        <span class="order-status status-@order.Status.ToLower()">@order.Status</span>
+                    </div>
+                    <div class="order-body">
+                        <p><strong>Date:</strong> @order.OrderDate.ToString("MMM dd, yyyy HH:mm")</p>
+                        <p><strong>Total:</strong> $@order.TotalAmount.ToString("F2")</p>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="empty-state">
+            <p class="empty-emoji">🛒</p>
+            <p class="empty-text">No orders yet!</p>
+            <a asp-controller="Home" asp-action="Menu" class="btn-primary">Start Ordering</a>
+        </div>
+    }
+</div>
+

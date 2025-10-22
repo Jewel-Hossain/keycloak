@@ -1,0 +1,109 @@
+@model IEnumerable<FoodiApp.Models.FoodItem>
+
+@{
+    ViewData["Title"] = "Home";
+}
+
+<div class="hero">
+    <div class="container">
+        <h1 class="hero-title">Welcome to Foodi! 🍕</h1>
+        <p class="hero-subtitle">Delicious food delivered to your door</p>
+        @if (User.Identity?.IsAuthenticated != true)
+        {
+            <div class="hero-actions">
+                <a asp-controller="Account" asp-action="Register" class="btn-hero">Get Started</a>
+                <a asp-controller="Account" asp-action="Login" class="btn-hero-outline">Login</a>
+            </div>
+        }
+        else
+        {
+            <div class="hero-actions">
+                <a asp-controller="Home" asp-action="Menu" class="btn-hero">Browse Menu</a>
+            </div>
+        }
+    </div>
+</div>
+
+<div class="container">
+    <section class="features">
+        <h2 class="section-title">Why Choose Foodi?</h2>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🔐</div>
+                <h3>Secure SSO</h3>
+                <p>Single Sign-On with Keycloak for enhanced security</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3>Fast Delivery</h3>
+                <p>Get your food delivered in under 30 minutes</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🍽️</div>
+                <h3>Fresh Food</h3>
+                <p>All meals prepared fresh with quality ingredients</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">💳</div>
+                <h3>Easy Payment</h3>
+                <p>Multiple payment options for your convenience</p>
+            </div>
+        </div>
+    </section>
+
+    @if (Model != null && Model.Any())
+    {
+        <section class="popular-items">
+            <h2 class="section-title">Popular Items</h2>
+            <div class="food-grid">
+                @foreach (var item in Model.Take(6))
+                {
+                    <div class="food-card">
+                        <div class="food-image">
+                            <span class="food-emoji">@GetFoodEmoji(item.Name)</span>
+                        </div>
+                        <h3 class="food-name">@item.Name</h3>
+                        <p class="food-description">@item.Description</p>
+                        <div class="food-footer">
+                            <span class="food-price">$@item.Price.ToString("F2")</span>
+                            @if (User.Identity?.IsAuthenticated == true)
+                            {
+                                <button class="btn-add-cart">Add to Cart</button>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        </section>
+    }
+
+    <section class="sso-section">
+        <div class="sso-card">
+            <h2>🔐 Powered by Keycloak SSO</h2>
+            <p>This application demonstrates full Single Sign-On integration with Keycloak:</p>
+            <ul class="sso-features">
+                <li>✅ Users created in Foodi are automatically synced to Keycloak</li>
+                <li>✅ Keycloak can authenticate users via Foodi (Identity Broker)</li>
+                <li>✅ Secure OpenID Connect (OIDC) protocol</li>
+                <li>✅ Seamless user experience across applications</li>
+            </ul>
+        </div>
+    </section>
+</div>
+
+@functions {
+    string GetFoodEmoji(string name)
+    {
+        return name.ToLower() switch
+        {
+            var n when n.Contains("pizza") => "🍕",
+            var n when n.Contains("burger") => "🍔",
+            var n when n.Contains("salad") => "🥗",
+            var n when n.Contains("pasta") || n.Contains("spaghetti") => "🍝",
+            var n when n.Contains("wing") || n.Contains("chicken") => "🍗",
+            var n when n.Contains("taco") || n.Contains("fish") => "🌮",
+            _ => "🍽️"
+        };
+    }
+}
+

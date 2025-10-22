@@ -1,0 +1,46 @@
+@model IEnumerable<FoodiApp.Models.FoodItem>
+
+@{
+    ViewData["Title"] = "Menu";
+}
+
+<div class="container">
+    <div class="page-header">
+        <h1 class="page-title">Our Menu 🍽️</h1>
+        <p class="page-subtitle">Choose from our delicious selection</p>
+    </div>
+
+    <div class="food-grid">
+        @foreach (var item in Model)
+        {
+            <div class="food-card">
+                <div class="food-image">
+                    <span class="food-emoji">@GetFoodEmoji(item.Name)</span>
+                </div>
+                <h3 class="food-name">@item.Name</h3>
+                <p class="food-description">@item.Description</p>
+                <div class="food-footer">
+                    <span class="food-price">$@item.Price.ToString("F2")</span>
+                    <button class="btn-add-cart" onclick="alert('Added to cart!')">Add to Cart</button>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@functions {
+    string GetFoodEmoji(string name)
+    {
+        return name.ToLower() switch
+        {
+            var n when n.Contains("pizza") => "🍕",
+            var n when n.Contains("burger") => "🍔",
+            var n when n.Contains("salad") => "🥗",
+            var n when n.Contains("pasta") || n.Contains("spaghetti") => "🍝",
+            var n when n.Contains("wing") || n.Contains("chicken") => "🍗",
+            var n when n.Contains("taco") || n.Contains("fish") => "🌮",
+            _ => "🍽️"
+        };
+    }
+}
+

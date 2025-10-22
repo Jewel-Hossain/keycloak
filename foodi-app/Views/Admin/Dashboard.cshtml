@@ -1,0 +1,102 @@
+@{
+    ViewData["Title"] = "Admin Dashboard";
+}
+
+<div class="container" style="padding: 2rem 0;">
+    <h1>⚙️ Admin Dashboard</h1>
+    <p class="text-muted">Welcome to the Foodi administration panel</p>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-top: 2rem;">
+        <div class="stats-card">
+            <div class="stats-icon" style="background: #4a90e2;">👥</div>
+            <div class="stats-info">
+                <h3>@ViewData["TotalUsers"]</h3>
+                <p>Total Users</p>
+            </div>
+        </div>
+
+        <div class="stats-card">
+            <div class="stats-icon" style="background: #27ae60;">✓</div>
+            <div class="stats-info">
+                <h3>@ViewData["ActiveUsers"]</h3>
+                <p>Active Users</p>
+            </div>
+        </div>
+
+        <div class="stats-card">
+            <div class="stats-icon" style="background: #e74c3c;">✗</div>
+            <div class="stats-info">
+                <h3>@ViewData["InactiveUsers"]</h3>
+                <p>Inactive Users</p>
+            </div>
+        </div>
+
+        <div class="stats-card">
+            <div class="stats-icon" style="background: #9b59b6;">🔄</div>
+            <div class="stats-info">
+                <h3>@ViewData["SyncedUsers"]</h3>
+                <p>Synced to Keycloak</p>
+            </div>
+        </div>
+    </div>
+
+    <div style="margin-top: 3rem;">
+        <h2>Quick Actions</h2>
+        <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+            <a asp-action="Users" class="btn-primary">👥 Manage Users</a>
+            <a asp-controller="Home" asp-action="Reports" class="btn-secondary">📊 View Reports</a>
+        </div>
+    </div>
+</div>
+
+<style>
+    .stats-card {
+        background: white;
+        border-radius: 8px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .stats-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: white;
+    }
+
+    .stats-info h3 {
+        margin: 0;
+        font-size: 2rem;
+        color: #2c3e50;
+    }
+
+    .stats-info p {
+        margin: 0;
+        color: #7f8c8d;
+        font-size: 0.9rem;
+    }
+
+    .btn-secondary {
+        display: inline-block;
+        padding: 0.75rem 1.5rem;
+        background: #7f8c8d;
+        color: white;
+        text-decoration: none;
+        border-radius: 6px;
+        font-weight: 500;
+        transition: background 0.3s ease;
+    }
+
+    .btn-secondary:hover {
+        background: #6c7a89;
+    }
+</style>
+
+

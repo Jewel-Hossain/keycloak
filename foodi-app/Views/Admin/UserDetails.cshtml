@@ -1,0 +1,232 @@
+@model FoodiApp.Models.User
+@{
+    ViewData["Title"] = "User Details";
+}
+
+<div class="container" style="padding: 2rem 0;">
+    <div style="margin-bottom: 2rem;">
+        <a asp-action="Users" class="btn-secondary">← Back to Users</a>
+    </div>
+
+    <div class="detail-card">
+        <h1>👤 User Details</h1>
+        
+        <div class="detail-section">
+            <h2>Basic Information</h2>
+            <div class="detail-grid">
+                <div class="detail-item">
+                    <label>Username:</label>
+                    <span>@Model.Username</span>
+                </div>
+                <div class="detail-item">
+                    <label>Email:</label>
+                    <span>@Model.Email</span>
+                </div>
+                <div class="detail-item">
+                    <label>First Name:</label>
+                    <span>@Model.FirstName</span>
+                </div>
+                <div class="detail-item">
+                    <label>Last Name:</label>
+                    <span>@Model.LastName</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="detail-section">
+            <h2>Role & Status</h2>
+            <div class="detail-grid">
+                <div class="detail-item">
+                    <label>Current Role:</label>
+                    <span class="role-badge role-@Model.Roles.ToLower()">
+                        @string.Join(", ", Model.GetRoles().Select(r => r.GetDisplayName()))
+                    </span>
+                </div>
+                <div class="detail-item">
+                    <label>Status:</label>
+                    @if (Model.IsActive)
+                    {
+                        <span class="status-badge status-active">Active</span>
+                    }
+                    else
+                    {
+                        <span class="status-badge status-inactive">Inactive</span>
+                    }
+                </div>
+                <div class="detail-item">
+                    <label>Synced to Keycloak:</label>
+                    @if (Model.SyncedToKeycloak)
+                    {
+                        <span style="color: #27ae60;">✓ Yes</span>
+                    }
+                    else
+                    {
+                        <span style="color: #e74c3c;">✗ No</span>
+                    }
+                </div>
+                <div class="detail-item">
+                    <label>Keycloak User ID:</label>
+                    <span>@(Model.KeycloakUserId ?? "N/A")</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="detail-section">
+            <h2>Timestamps</h2>
+            <div class="detail-grid">
+                <div class="detail-item">
+                    <label>Created At:</label>
+                    <span>@Model.CreatedAt.ToString("MMM dd, yyyy HH:mm:ss")</span>
+                </div>
+                <div class="detail-item">
+                    <label>Last Modified:</label>
+                    <span>@(Model.LastModifiedAt?.ToString("MMM dd, yyyy HH:mm:ss") ?? "Never")</span>
+                </div>
+                <div class="detail-item">
+                    <label>Deactivated At:</label>
+                    <span>@(Model.DeactivatedAt?.ToString("MMM dd, yyyy HH:mm:ss") ?? "N/A")</span>
+                </div>
+            </div>
+        </div>
+
+        @if (User.IsInRole("Head"))
+        {
+            <div class="detail-section">
+                <h2>Management Actions</h2>
+                
+                <div style="margin-bottom: 1.5rem;">
+                    <h3>Change Role</h3>
+                    <form asp-action="UpdateUserRole" method="post" style="display: flex; gap: 1rem; align-items: center;">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@Model.Id" />
+                        <select name="newRole" class="form-control" style="max-width: 200px;">
+                            <option value="Agent" selected="@(Model.Roles == "Agent")">Agent</option>
+                            <option value="Lead" selected="@(Model.Roles == "Lead")">Lead</option>
+                            <option value="Admin" selected="@(Model.Roles == "Admin")">Administrator</option>
+                            <option value="Head" selected="@(Model.Roles == "Head")">Head</option>
+                        </select>
+                        <button type="submit" class="btn-primary">Update Role</button>
+                    </form>
+                </div>
+
+                <div style="display: flex; gap: 1rem;">
+                    <form asp-action="ToggleUserStatus" asp-route-id="@Model.Id" method="post">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn-warning" 
+                                onclick="return confirm('Are you sure you want to @(Model.IsActive ? "deactivate" : "activate") this user?');">
+                            @(Model.IsActive ? "Deactivate User" : "Activate User")
+                        </button>
+                    </form>
+
+                    @if (Model.SyncedToKeycloak)
+                    {
+                        <form asp-action="ResyncUser" asp-route-id="@Model.Id" method="post">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn-secondary">🔄 Resync to Keycloak</button>
+                        </form>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<style>
+    .detail-card {
+        background: white;
+        border-radius: 8px;
+        padding: 2rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .detail-card h1 {
+        margin-bottom: 2rem;
+        color: #2c3e50;
+    }
+
+    .detail-section {
+        margin-bottom: 2rem;
+        padding-bottom: 2rem;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .detail-section:last-child {
+        border-bottom: none;
+    }
+
+    .detail-section h2 {
+        font-size: 1.25rem;
+        color: #34495e;
+        margin-bottom: 1rem;
+    }
+
+    .detail-section h3 {
+        font-size: 1rem;
+        color: #7f8c8d;
+        margin-bottom: 0.5rem;
+    }
+
+    .detail-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .detail-item {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .detail-item label {
+        font-weight: 600;
+        color: #7f8c8d;
+        font-size: 0.9rem;
+    }
+
+    .detail-item span {
+        color: #2c3e50;
+    }
+
+    .btn-warning {
+        display: inline-block;
+        padding: 0.75rem 1.5rem;
+        background: #f39c12;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 0.3s ease;
+    }
+
+    .btn-warning:hover {
+        background: #e67e22;
+    }
+
+    .role-badge {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        border-radius: 12px;
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+
+    .role-head { background: #e74c3c; color: white; }
+    .role-admin { background: #3498db; color: white; }
+    .role-lead { background: #9b59b6; color: white; }
+    .role-agent { background: #95a5a6; color: white; }
+
+    .status-badge {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        border-radius: 12px;
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+
+    .status-active { background: #d4edda; color: #155724; }
+    .status-inactive { background: #f8d7da; color: #721c24; }
+</style>
+
+

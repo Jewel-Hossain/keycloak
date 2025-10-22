@@ -1,0 +1,64 @@
+@model UpdateProfileViewModel
+@{
+    ViewData["Title"] = "My Profile";
+}
+
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <h1>👤 My Profile</h1>
+            <p>Update your account information</p>
+        </div>
+
+        @if (ViewData["UserRolesDisplay"] != null)
+        {
+            <div style="background: #f0f7ff; border-left: 4px solid #4a90e2; padding: 1rem; margin-bottom: 1.5rem; border-radius: 4px;">
+                <strong>🎭 Account Type:</strong> 
+                <span style="color: #4a90e2; font-weight: 600;">@ViewData["UserRolesDisplay"]</span>
+                <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem; color: #666;">
+                    Your role determines which features and menu items you can access in the application.
+                </p>
+            </div>
+        }
+
+        <form asp-action="UpdateProfile" method="post" class="auth-form">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+            <div class="form-group">
+                <label asp-for="Email" class="form-label"></label>
+                <input asp-for="Email" class="form-control" />
+                <span asp-validation-for="Email" class="text-danger"></span>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label asp-for="FirstName" class="form-label">First Name</label>
+                    <input asp-for="FirstName" class="form-control" />
+                    <span asp-validation-for="FirstName" class="text-danger"></span>
+                </div>
+
+                <div class="form-group">
+                    <label asp-for="LastName" class="form-label">Last Name</label>
+                    <input asp-for="LastName" class="form-control" />
+                    <span asp-validation-for="LastName" class="text-danger"></span>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-submit">💾 Update Profile</button>
+        </form>
+
+        <div class="auth-footer" style="margin-top: 2rem;">
+            <a asp-action="ChangePassword">🔐 Change Password</a> |
+            <a href="#" onclick="if(confirm('Are you sure you want to deactivate your account?')) { document.getElementById('deactivateForm').submit(); }" style="color: var(--danger-color);">❌ Deactivate Account</a>
+        </div>
+
+        <form id="deactivateForm" asp-action="DeactivateAccount" method="post" style="display: none;">
+            @Html.AntiForgeryToken()
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
+

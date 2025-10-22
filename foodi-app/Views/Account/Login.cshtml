@@ -1,0 +1,55 @@
+@model FoodiApp.Models.LoginViewModel
+
+@{
+    ViewData["Title"] = "Login";
+}
+
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <h1>Welcome Back! 👋</h1>
+            <p>Login to your Foodi account</p>
+        </div>
+
+        <form asp-action="Login" asp-controller="Account" method="post" class="auth-form">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            
+            <div class="form-group">
+                <label asp-for="UsernameOrEmail" class="form-label"></label>
+                <input asp-for="UsernameOrEmail" class="form-control" placeholder="Enter your username or email" />
+                <span asp-validation-for="UsernameOrEmail" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Password" class="form-label"></label>
+                <input asp-for="Password" class="form-control" type="password" placeholder="Enter your password" />
+                <span asp-validation-for="Password" class="text-danger"></span>
+            </div>
+
+            <div class="form-group-checkbox">
+                <label>
+                    <input asp-for="RememberMe" type="checkbox" />
+                    <span asp-for="RememberMe"></span>
+                </label>
+            </div>
+
+            <button type="submit" class="btn-submit">Login</button>
+        </form>
+
+        <div class="auth-footer">
+            <p>Don't have an account? <a asp-controller="Account" asp-action="Register">Sign up here</a></p>
+        </div>
+
+        <div class="sso-info-box">
+            <p class="sso-info-text">
+                🔐 <strong>SSO Enabled:</strong> Your account is synced with Keycloak. 
+                You can also login through Keycloak's "Login with Foodi" option!
+            </p>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}
+

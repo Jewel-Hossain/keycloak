@@ -1,0 +1,8 @@
+goal : test sso with keycloak + demo foodi .net app
+
+- read full project .
+- create a simple .net 8 foodi app with ui
+- if foodi app create a user should sync with keycloak
+- keycloak show login-with foodi button
+- if click to login-with-foodi , foodi must validate u know what i mean full sso
+

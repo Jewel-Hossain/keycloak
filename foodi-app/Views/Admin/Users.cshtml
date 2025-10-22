@@ -1,0 +1,156 @@
+@model List<FoodiApp.Models.User>
+@{
+    ViewData["Title"] = "User Management";
+}
+
+<div class="container" style="padding: 2rem 0;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+        <div>
+            <h1>👥 User Management</h1>
+            <p class="text-muted">Manage all users in the system</p>
+        </div>
+        <a asp-action="Dashboard" class="btn-secondary">← Back to Dashboard</a>
+    </div>
+
+    @if (Model.Any())
+    {
+        <div style="background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden;">
+            <table class="users-table">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Name</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>Synced</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var user in Model)
+                    {
+                        <tr>
+                            <td><strong>@user.Username</strong></td>
+                            <td>@user.Email</td>
+                            <td>@user.FirstName @user.LastName</td>
+                            <td>
+                                <span class="role-badge role-@user.Roles.ToLower()">
+                                    @string.Join(", ", user.GetRoles().Select(r => r.GetDisplayName()))
+                                </span>
+                            </td>
+                            <td>
+                                @if (user.IsActive)
+                                {
+                                    <span class="status-badge status-active">Active</span>
+                                }
+                                else
+                                {
+                                    <span class="status-badge status-inactive">Inactive</span>
+                                }
+                            </td>
+                            <td>
+                                @if (user.SyncedToKeycloak)
+                                {
+                                    <span style="color: #27ae60;">✓ Yes</span>
+                                }
+                                else
+                                {
+                                    <span style="color: #e74c3c;">✗ No</span>
+                                }
+                            </td>
+                            <td>@user.CreatedAt.ToString("MMM dd, yyyy")</td>
+                            <td>
+                                <a asp-action="UserDetails" asp-route-id="@user.Id" class="btn-small">View</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <div class="empty-state">
+            <p>No users found in the system.</p>
+        </div>
+    }
+</div>
+
+<style>
+    .users-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .users-table thead {
+        background: #f8f9fa;
+    }
+
+    .users-table th {
+        padding: 1rem;
+        text-align: left;
+        font-weight: 600;
+        color: #2c3e50;
+        border-bottom: 2px solid #e9ecef;
+    }
+
+    .users-table td {
+        padding: 1rem;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .users-table tbody tr:hover {
+        background: #f8f9fa;
+    }
+
+    .role-badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+
+    .role-head { background: #e74c3c; color: white; }
+    .role-admin { background: #3498db; color: white; }
+    .role-lead { background: #9b59b6; color: white; }
+    .role-agent { background: #95a5a6; color: white; }
+
+    .status-badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+
+    .status-active { background: #d4edda; color: #155724; }
+    .status-inactive { background: #f8d7da; color: #721c24; }
+
+    .btn-small {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        background: #4a90e2;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+        font-size: 0.85rem;
+        transition: background 0.3s ease;
+    }
+
+    .btn-small:hover {
+        background: #357abd;
+    }
+
+    .empty-state {
+        background: white;
+        border-radius: 8px;
+        padding: 3rem;
+        text-align: center;
+        color: #7f8c8d;
+    }
+</style>
+
+

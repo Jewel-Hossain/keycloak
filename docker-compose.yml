@@ -1,0 +1,111 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: keycloak-postgres
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: keycloak123
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - keycloak-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  keycloak:
+    build: .
+    container_name: keycloak-server
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin123
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak123
+      KC_HOSTNAME_STRICT: false
+      KC_HOSTNAME_STRICT_HTTPS: false
+      KC_HTTP_ENABLED: true
+      KC_HEALTH_ENABLED: true
+      KC_METRICS_ENABLED: true
+      # Email configuration for OTP with MailHog
+      KC_SPI_EMAIL_DEFAULT_FROM: noreply@localhost
+      KC_SPI_EMAIL_DEFAULT_REPLY_TO: noreply@localhost
+      KC_SPI_EMAIL_DEFAULT_FROM_DISPLAY_NAME: Keycloak
+      KC_SPI_EMAIL_SMTP_HOST: mailhog
+      KC_SPI_EMAIL_SMTP_PORT: 1025
+      KC_SPI_EMAIL_SMTP_SSL: false
+      KC_SPI_EMAIL_SMTP_STARTTLS: false
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+    networks:
+      - keycloak-network
+    volumes:
+      - ./providers:/opt/keycloak/providers
+    healthcheck:
+      test: ["CMD-SHELL", "exit 0"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: mailhog-server
+    ports:
+      - "1025:1025"  # SMTP port
+      - "8025:8025"  # Web UI port
+    networks:
+      - keycloak-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8025"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  foodi-app:
+    build: ./foodi-app
+    container_name: foodi-app
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:5000
+      ConnectionStrings__DefaultConnection: "Data Source=/app/data/foodi.db"
+      Keycloak__BaseUrl: http://keycloak:8080
+      Keycloak__Realm: foodi
+      Keycloak__AdminUsername: admin
+      Keycloak__AdminPassword: admin123
+    ports:
+      - "5000:5000"
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    networks:
+      - keycloak-network
+    volumes:
+      - foodi_data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  postgres_data:
+  foodi_data:
+
+networks:
+  keycloak-network:
+    driver: bridge
