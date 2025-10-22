@@ -12,11 +12,29 @@
 
         @if (ViewData["UserRolesDisplay"] != null)
         {
-            <div style="background: #f0f7ff; border-left: 4px solid #4a90e2; padding: 1rem; margin-bottom: 1.5rem; border-radius: 4px;">
-                <strong>🎭 Account Type:</strong> 
+            <div style="background: #f0f7ff; border-left: 4px solid #4a90e2; padding: 1rem; margin-bottom: 1rem; border-radius: 4px;">
+                <strong>🎭 Foodi Role:</strong> 
                 <span style="color: #4a90e2; font-weight: 600;">@ViewData["UserRolesDisplay"]</span>
                 <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem; color: #666;">
-                    Your role determines which features and menu items you can access in the application.
+                    Your Foodi role determines which features and menu items you can access in the application.
+                </p>
+            </div>
+        }
+
+        @if (ViewData["UserKeycloakRoles"] is List<string> keycloakRoles && keycloakRoles.Any())
+        {
+            <div style="background: #f0fff4; border-left: 4px solid #27ae60; padding: 1rem; margin-bottom: 1.5rem; border-radius: 4px;">
+                <strong>🔐 Keycloak Roles:</strong>
+                <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem;">
+                    @foreach (var role in keycloakRoles)
+                    {
+                        <span style="display: inline-block; padding: 0.3rem 0.7rem; background: #d4edda; color: #155724; border-radius: 6px; font-size: 0.85rem;">
+                            @role
+                        </span>
+                    }
+                </div>
+                <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem; color: #666;">
+                    These roles are synced to Keycloak and may be used by other integrated applications.
                 </p>
             </div>
         }

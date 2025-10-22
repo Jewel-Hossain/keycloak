@@ -15,21 +15,29 @@ public class AccountController : Controller
 {
     private readonly ApplicationDbContext _context;
     private readonly KeycloakSyncService _keycloakSync;
+    private readonly RoleService _roleService;
     private readonly ILogger<AccountController> _logger;
 
     public AccountController(
         ApplicationDbContext context,
         KeycloakSyncService keycloakSync,
+        RoleService roleService,
         ILogger<AccountController> logger)
     {
         _context = context;
         _keycloakSync = keycloakSync;
+        _roleService = roleService;
         _logger = logger;
     }
 
     [HttpGet]
-    public IActionResult Register()
+    public async Task<IActionResult> Register()
     {
+        // Fetch Keycloak roles to display in the form
+        var (foodiRoles, keycloakRoles) = await _roleService.GetAllRolesAsync();
+        ViewBag.FoodiRoles = foodiRoles;
+        ViewBag.KeycloakRoles = keycloakRoles;
+        
         return View();
     }
 
@@ -39,6 +47,10 @@ public class AccountController : Controller
     {
         if (!ModelState.IsValid)
         {
+            // Re-populate roles for display
+            var (foodiRoles, keycloakRoles) = await _roleService.GetAllRolesAsync();
+            ViewBag.FoodiRoles = foodiRoles;
+            ViewBag.KeycloakRoles = keycloakRoles;
             return View(model);
         }
 
@@ -49,11 +61,15 @@ public class AccountController : Controller
         if (existingUser != null)
         {
             ModelState.AddModelError("", "User with this email or username already exists.");
+            var (foodiRoles, keycloakRoles) = await _roleService.GetAllRolesAsync();
+            ViewBag.FoodiRoles = foodiRoles;
+            ViewBag.KeycloakRoles = keycloakRoles;
             return View(model);
         }
 
-        // Get selected role or default to Agent
-        var selectedRole = model.GetSelectedRole();
+        // Get selected roles
+        var selectedFoodiRole = model.GetSelectedRole();
+        var selectedKeycloakRoles = model.GetSelectedKeycloakRoles();
         
         // Create new user
         var user = new User
@@ -64,8 +80,11 @@ public class AccountController : Controller
             LastName = model.LastName,
             PasswordHash = HashPassword(model.Password),
             CreatedAt = DateTime.UtcNow,
-            Roles = selectedRole.ToString() // Set the selected role
+            Roles = selectedFoodiRole.ToString() // Set the Foodi internal role
         };
+
+        // Set Keycloak roles
+        user.SetKeycloakRoles(selectedKeycloakRoles);
 
         _context.Users.Add(user);
         await _context.SaveChangesAsync();
@@ -80,19 +99,22 @@ public class AccountController : Controller
                 user.KeycloakUserId = keycloakUserId;
                 await _context.SaveChangesAsync();
                 
-                // Sync roles to Keycloak
-                try
+                // Sync Keycloak roles to Keycloak server
+                if (selectedKeycloakRoles.Any())
                 {
-                    await _keycloakSync.SyncUserRolesToKeycloakAsync(keycloakUserId, user.GetRoles());
-                    _logger.LogInformation($"User {user.Username} roles synced to Keycloak: {user.Roles}");
-                }
-                catch (Exception roleEx)
-                {
-                    _logger.LogError(roleEx, "Error syncing roles to Keycloak");
+                    try
+                    {
+                        await _keycloakSync.SyncUserKeycloakRolesAsync(keycloakUserId, selectedKeycloakRoles);
+                        _logger.LogInformation($"User {user.Username} Keycloak roles synced: {string.Join(", ", selectedKeycloakRoles)}");
+                    }
+                    catch (Exception roleEx)
+                    {
+                        _logger.LogError(roleEx, "Error syncing Keycloak roles to Keycloak");
+                    }
                 }
                 
-                TempData["Success"] = $"Account created successfully as {selectedRole.GetDisplayName()} and synced with Keycloak!";
-                _logger.LogInformation($"User {user.Username} registered with role {selectedRole} and synced to Keycloak");
+                TempData["Success"] = $"Account created successfully as {selectedFoodiRole.GetDisplayName()} and synced with Keycloak!";
+                _logger.LogInformation($"User {user.Username} registered with Foodi role: {selectedFoodiRole}, Keycloak roles: {string.Join(", ", selectedKeycloakRoles)}");
             }
             else
             {
@@ -216,6 +238,7 @@ public class AccountController : Controller
         // Pass role information to view
         ViewData["UserRoles"] = user.GetRoles();
         ViewData["UserRolesDisplay"] = string.Join(", ", user.GetRoles().Select(r => r.GetDisplayName()));
+        ViewData["UserKeycloakRoles"] = user.GetKeycloakRoles();
 
         return View(model);
     }

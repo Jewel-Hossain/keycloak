@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using FoodiApp.Models;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace FoodiApp.Services;
 
@@ -10,12 +11,16 @@ public class KeycloakSyncService
     private readonly HttpClient _httpClient;
     private readonly IConfiguration _configuration;
     private readonly ILogger<KeycloakSyncService> _logger;
+    private readonly IMemoryCache _cache;
+    private const string ROLES_CACHE_KEY = "keycloak_roles";
+    private static readonly TimeSpan RolesCacheDuration = TimeSpan.FromMinutes(5);
 
-    public KeycloakSyncService(HttpClient httpClient, IConfiguration configuration, ILogger<KeycloakSyncService> logger)
+    public KeycloakSyncService(HttpClient httpClient, IConfiguration configuration, ILogger<KeycloakSyncService> logger, IMemoryCache cache)
     {
         _httpClient = httpClient;
         _configuration = configuration;
         _logger = logger;
+        _cache = cache;
     }
 
     public virtual async Task<string?> SyncUserToKeycloakAsync(User user, string plainPassword)
@@ -262,6 +267,17 @@ public class KeycloakSyncService
 
     public virtual async Task<bool> SyncUserRolesToKeycloakAsync(string keycloakUserId, List<Role> roles)
     {
+        // Convert Role enum to string list and call the new method
+        var roleNames = roles.Select(r => r.ToString().ToLower()).ToList();
+        return await SyncUserKeycloakRolesAsync(keycloakUserId, roleNames);
+    }
+
+    /// <summary>
+    /// Sync user's Keycloak roles to Keycloak server
+    /// This replaces the user's Keycloak roles with the provided list
+    /// </summary>
+    public virtual async Task<bool> SyncUserKeycloakRolesAsync(string keycloakUserId, List<string> roleNames)
+    {
         try
         {
             if (string.IsNullOrEmpty(keycloakUserId))
@@ -285,27 +301,47 @@ public class KeycloakSyncService
 
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-            // Ensure all roles exist in Keycloak
-            foreach (var role in roles)
+            // Get the foodi-app client UUID
+            var clientResponse = await _httpClient.GetAsync($"{baseUrl}/admin/realms/{realm}/clients?clientId=foodi-app");
+            if (!clientResponse.IsSuccessStatusCode)
             {
-                await EnsureRoleExistsAsync(baseUrl!, realm!, token, role);
+                _logger.LogError($"Failed to get foodi-app client: {clientResponse.StatusCode}");
+                return false;
             }
 
-            // Get current user's role mappings
+            var clientContent = await clientResponse.Content.ReadAsStringAsync();
+            var clients = JsonSerializer.Deserialize<List<JsonElement>>(clientContent);
+            
+            if (clients == null || !clients.Any())
+            {
+                _logger.LogError("foodi-app client not found");
+                return false;
+            }
+
+            var clientUuid = clients[0].GetProperty("id").GetString();
+            if (string.IsNullOrEmpty(clientUuid))
+            {
+                _logger.LogError("Could not get foodi-app client UUID");
+                return false;
+            }
+
+            // Get current user's client role mappings
             var currentRolesResponse = await _httpClient.GetAsync(
-                $"{baseUrl}/admin/realms/{realm}/users/{keycloakUserId}/role-mappings/realm");
+                $"{baseUrl}/admin/realms/{realm}/users/{keycloakUserId}/role-mappings/clients/{clientUuid}");
 
             if (!currentRolesResponse.IsSuccessStatusCode)
             {
-                _logger.LogError($"Failed to get current roles for user: {currentRolesResponse.StatusCode}");
+                _logger.LogError($"Failed to get current client roles for user: {currentRolesResponse.StatusCode}");
                 return false;
             }
 
             var currentRolesContent = await currentRolesResponse.Content.ReadAsStringAsync();
             var currentRoles = JsonSerializer.Deserialize<List<JsonElement>>(currentRolesContent);
 
-            // Remove old Foodi role assignments (head, admin, lead, agent)
-            var foodiRoleNames = new[] { "head", "admin", "lead", "agent" };
+            // Get all available client roles to identify which ones to manage
+            var allKeycloakRoles = await GetAllKeycloakRolesAsync();
+            var managedRoleNames = allKeycloakRoles.Select(r => r.ToLower()).ToList();
+            
             var rolesToRemove = new List<object>();
             
             if (currentRoles != null)
@@ -313,8 +349,9 @@ public class KeycloakSyncService
                 foreach (var roleElement in currentRoles)
                 {
                     var roleName = roleElement.GetProperty("name").GetString();
-                    if (roleName != null && foodiRoleNames.Contains(roleName.ToLower()))
+                    if (roleName != null && managedRoleNames.Contains(roleName.ToLower()))
                     {
+                        // Only remove roles that we manage
                         rolesToRemove.Add(new
                         {
                             id = roleElement.GetProperty("id").GetString(),
@@ -324,6 +361,7 @@ public class KeycloakSyncService
                 }
             }
 
+            // Remove old role assignments
             if (rolesToRemove.Any())
             {
                 var removeContent = new StringContent(
@@ -334,20 +372,20 @@ public class KeycloakSyncService
                 var removeResponse = await _httpClient.SendAsync(new HttpRequestMessage
                 {
                     Method = HttpMethod.Delete,
-                    RequestUri = new Uri($"{baseUrl}/admin/realms/{realm}/users/{keycloakUserId}/role-mappings/realm"),
+                    RequestUri = new Uri($"{baseUrl}/admin/realms/{realm}/users/{keycloakUserId}/role-mappings/clients/{clientUuid}"),
                     Content = removeContent
                 });
 
                 if (!removeResponse.IsSuccessStatusCode)
                 {
-                    _logger.LogWarning($"Failed to remove old roles: {removeResponse.StatusCode}");
+                    _logger.LogWarning($"Failed to remove old client roles: {removeResponse.StatusCode}");
                 }
             }
 
             // Assign new roles
-            foreach (var role in roles)
+            foreach (var roleName in roleNames)
             {
-                var roleInfo = await GetRoleByNameAsync(baseUrl!, realm!, token, role);
+                var roleInfo = await GetClientRoleByNameAsync(baseUrl!, realm!, token, clientUuid, roleName);
                 if (roleInfo != null)
                 {
                     var assignRoleData = new[]
@@ -365,17 +403,17 @@ public class KeycloakSyncService
                         "application/json");
 
                     var assignResponse = await _httpClient.PostAsync(
-                        $"{baseUrl}/admin/realms/{realm}/users/{keycloakUserId}/role-mappings/realm",
+                        $"{baseUrl}/admin/realms/{realm}/users/{keycloakUserId}/role-mappings/clients/{clientUuid}",
                         assignContent);
 
                     if (assignResponse.IsSuccessStatusCode)
                     {
-                        _logger.LogInformation($"Successfully assigned role {role} to user in Keycloak");
+                        _logger.LogInformation($"Successfully assigned client role {roleName} to user in Keycloak");
                     }
                     else
                     {
                         var error = await assignResponse.Content.ReadAsStringAsync();
-                        _logger.LogError($"Failed to assign role {role}: {assignResponse.StatusCode} - {error}");
+                        _logger.LogError($"Failed to assign client role {roleName}: {assignResponse.StatusCode} - {error}");
                     }
                 }
             }
@@ -384,7 +422,7 @@ public class KeycloakSyncService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error syncing user roles to Keycloak");
+            _logger.LogError(ex, "Error syncing user client roles to Keycloak");
             return false;
         }
     }
@@ -441,9 +479,14 @@ public class KeycloakSyncService
 
     private async Task<JsonElement?> GetRoleByNameAsync(string baseUrl, string realm, string token, Role role)
     {
+        var roleName = role.ToString().ToLower();
+        return await GetRoleByNameStringAsync(baseUrl, realm, token, roleName);
+    }
+
+    private async Task<JsonElement?> GetRoleByNameStringAsync(string baseUrl, string realm, string token, string roleName)
+    {
         try
         {
-            var roleName = role.ToString().ToLower();
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             
             var response = await _httpClient.GetAsync($"{baseUrl}/admin/realms/{realm}/roles/{roleName}");
@@ -458,8 +501,79 @@ public class KeycloakSyncService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"Error getting role {role} from Keycloak");
+            _logger.LogError(ex, $"Error getting role {roleName} from Keycloak");
             return null;
+        }
+    }
+
+    private async Task<JsonElement?> GetClientRoleByNameAsync(string baseUrl, string realm, string token, string clientUuid, string roleName)
+    {
+        try
+        {
+            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            
+            var response = await _httpClient.GetAsync($"{baseUrl}/admin/realms/{realm}/clients/{clientUuid}/roles/{roleName}");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                return JsonSerializer.Deserialize<JsonElement>(content);
+            }
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, $"Error getting client role {roleName} from Keycloak");
+            return null;
+        }
+    }
+
+    private async Task<bool> EnsureRoleExistsByNameAsync(string baseUrl, string realm, string token, string roleName)
+    {
+        try
+        {
+            // Check if role exists
+            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            var response = await _httpClient.GetAsync($"{baseUrl}/admin/realms/{realm}/roles/{roleName}");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                return true; // Role already exists
+            }
+
+            // Create role if it doesn't exist
+            var roleData = new
+            {
+                name = roleName,
+                description = $"Role: {roleName}"
+            };
+
+            var content = new StringContent(
+                JsonSerializer.Serialize(roleData),
+                Encoding.UTF8,
+                "application/json");
+
+            var createResponse = await _httpClient.PostAsync(
+                $"{baseUrl}/admin/realms/{realm}/roles",
+                content);
+
+            if (createResponse.IsSuccessStatusCode || createResponse.StatusCode == System.Net.HttpStatusCode.Conflict)
+            {
+                _logger.LogInformation($"Ensured role {roleName} exists in Keycloak");
+                return true;
+            }
+            else
+            {
+                var error = await createResponse.Content.ReadAsStringAsync();
+                _logger.LogError($"Failed to create role {roleName}: {createResponse.StatusCode} - {error}");
+                return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, $"Error ensuring role {roleName} exists in Keycloak");
+            return false;
         }
     }
 
@@ -475,8 +589,9 @@ public class KeycloakSyncService
                 { "password", password }
             };
 
+            // Admin token must be fetched from master realm
             var response = await _httpClient.PostAsync(
-                $"{baseUrl}/realms/{realm}/protocol/openid-connect/token",
+                $"{baseUrl}/realms/master/protocol/openid-connect/token",
                 new FormUrlEncodedContent(tokenRequest));
 
             if (response.IsSuccessStatusCode)
@@ -493,6 +608,113 @@ public class KeycloakSyncService
             _logger.LogError(ex, "Error getting Keycloak admin token");
             return null;
         }
+    }
+
+    /// <summary>
+    /// Get all available client roles from Keycloak foodi-app client
+    /// Cached for 5 minutes to reduce API calls
+    /// </summary>
+    public virtual async Task<List<string>> GetAllKeycloakRolesAsync()
+    {
+        try
+        {
+            // Check cache first
+            if (_cache.TryGetValue(ROLES_CACHE_KEY, out List<string>? cachedRoles) && cachedRoles != null)
+            {
+                _logger.LogInformation("Returning cached Keycloak client roles");
+                return cachedRoles;
+            }
+
+            var baseUrl = _configuration["Keycloak:BaseUrl"];
+            var realm = _configuration["Keycloak:Realm"];
+            var adminUsername = _configuration["Keycloak:AdminUsername"];
+            var adminPassword = _configuration["Keycloak:AdminPassword"];
+
+            // Get admin access token
+            var token = await GetAdminTokenAsync(baseUrl!, realm!, adminUsername!, adminPassword!);
+            if (string.IsNullOrEmpty(token))
+            {
+                _logger.LogError("Failed to get Keycloak admin token for fetching roles");
+                return new List<string>();
+            }
+
+            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            // First, get the foodi-app client UUID
+            var clientResponse = await _httpClient.GetAsync($"{baseUrl}/admin/realms/{realm}/clients?clientId=foodi-app");
+            if (!clientResponse.IsSuccessStatusCode)
+            {
+                _logger.LogError($"Failed to get foodi-app client: {clientResponse.StatusCode}");
+                return new List<string>();
+            }
+
+            var clientContent = await clientResponse.Content.ReadAsStringAsync();
+            var clients = JsonSerializer.Deserialize<List<JsonElement>>(clientContent);
+            
+            if (clients == null || !clients.Any())
+            {
+                _logger.LogError("foodi-app client not found");
+                return new List<string>();
+            }
+
+            var clientUuid = clients[0].GetProperty("id").GetString();
+            if (string.IsNullOrEmpty(clientUuid))
+            {
+                _logger.LogError("Could not get foodi-app client UUID");
+                return new List<string>();
+            }
+
+            // Fetch all client roles
+            var response = await _httpClient.GetAsync($"{baseUrl}/admin/realms/{realm}/clients/{clientUuid}/roles");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var roles = JsonSerializer.Deserialize<List<JsonElement>>(content);
+
+                var roleNames = new List<string>();
+                if (roles != null)
+                {
+                    foreach (var roleElement in roles)
+                    {
+                        if (roleElement.TryGetProperty("name", out var nameProperty))
+                        {
+                            var roleName = nameProperty.GetString();
+                            if (!string.IsNullOrWhiteSpace(roleName))
+                            {
+                                roleNames.Add(roleName);
+                            }
+                        }
+                    }
+                }
+
+                // Cache the results
+                _cache.Set(ROLES_CACHE_KEY, roleNames, RolesCacheDuration);
+                _logger.LogInformation($"Successfully fetched {roleNames.Count} Keycloak client roles");
+                
+                return roleNames;
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                _logger.LogError($"Failed to fetch Keycloak client roles: {response.StatusCode} - {error}");
+                return new List<string>();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching Keycloak client roles");
+            return new List<string>();
+        }
+    }
+
+    /// <summary>
+    /// Clear the roles cache (useful after creating/deleting roles in Keycloak)
+    /// </summary>
+    public void ClearRolesCache()
+    {
+        _cache.Remove(ROLES_CACHE_KEY);
+        _logger.LogInformation("Keycloak roles cache cleared");
     }
 }
 

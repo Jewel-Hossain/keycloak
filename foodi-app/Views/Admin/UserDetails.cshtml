@@ -34,13 +34,14 @@
         </div>
 
         <div class="detail-section">
-            <h2>Role & Status</h2>
+            <h2>Foodi Role & Status</h2>
             <div class="detail-grid">
                 <div class="detail-item">
-                    <label>Current Role:</label>
+                    <label>Foodi Role:</label>
                     <span class="role-badge role-@Model.Roles.ToLower()">
                         @string.Join(", ", Model.GetRoles().Select(r => r.GetDisplayName()))
                     </span>
+                    <small style="color: #7f8c8d;">Controls application permissions</small>
                 </div>
                 <div class="detail-item">
                     <label>Status:</label>
@@ -72,6 +73,29 @@
         </div>
 
         <div class="detail-section">
+            <h2>Keycloak Roles</h2>
+            <div class="detail-grid">
+                <div class="detail-item">
+                    <label>Current Keycloak Roles:</label>
+                    @if (Model.GetKeycloakRoles().Any())
+                    {
+                        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                            @foreach (var role in Model.GetKeycloakRoles())
+                            {
+                                <span class="keycloak-role-badge">@role</span>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <span style="color: #95a5a6;">No Keycloak roles assigned</span>
+                    }
+                    <small style="color: #7f8c8d;">Synced to Keycloak server</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="detail-section">
             <h2>Timestamps</h2>
             <div class="detail-grid">
                 <div class="detail-item">
@@ -95,17 +119,59 @@
                 <h2>Management Actions</h2>
                 
                 <div style="margin-bottom: 1.5rem;">
-                    <h3>Change Role</h3>
+                    <h3>Change Foodi Role</h3>
                     <form asp-action="UpdateUserRole" method="post" style="display: flex; gap: 1rem; align-items: center;">
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="id" value="@Model.Id" />
-                        <select name="newRole" class="form-control" style="max-width: 200px;">
-                            <option value="Agent" selected="@(Model.Roles == "Agent")">Agent</option>
-                            <option value="Lead" selected="@(Model.Roles == "Lead")">Lead</option>
-                            <option value="Admin" selected="@(Model.Roles == "Admin")">Administrator</option>
-                            <option value="Head" selected="@(Model.Roles == "Head")">Head</option>
+                        <select name="newRole" class="form-control" style="max-width: 300px;">
+                            @if (ViewBag.FoodiRoles != null)
+                            {
+                                @foreach (var role in ViewBag.FoodiRoles)
+                                {
+                                    <option value="@role.Value" selected="@(Model.Roles == role.Value)">@role.Name - @role.Description</option>
+                                }
+                            }
+                            else
+                            {
+                                <option value="Agent" selected="@(Model.Roles == "Agent")">Agent</option>
+                                <option value="Lead" selected="@(Model.Roles == "Lead")">Lead</option>
+                                <option value="Admin" selected="@(Model.Roles == "Admin")">Administrator</option>
+                                <option value="Head" selected="@(Model.Roles == "Head")">Head</option>
+                            }
                         </select>
-                        <button type="submit" class="btn-primary">Update Role</button>
+                        <button type="submit" class="btn-primary">Update Foodi Role</button>
+                    </form>
+                </div>
+
+                <div style="margin-bottom: 1.5rem;">
+                    <h3>Manage Keycloak Roles</h3>
+                    <form asp-action="UpdateUserKeycloakRoles" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@Model.Id" />
+                        @if (ViewBag.AvailableKeycloakRoles != null && ViewBag.AvailableKeycloakRoles.Count > 0)
+                        {
+                            <div class="checkbox-group" style="margin-bottom: 1rem;">
+                                @foreach (var role in ViewBag.AvailableKeycloakRoles)
+                                {
+                                    var isChecked = Model.GetKeycloakRoles().Contains(role.Value);
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" 
+                                               name="selectedKeycloakRoles" 
+                                               value="@role.Value" 
+                                               id="kc_@role.Value"
+                                               checked="@isChecked" />
+                                        <label for="kc_@role.Value">
+                                            <strong>@role.Name</strong> - @role.Description
+                                        </label>
+                                    </div>
+                                }
+                            </div>
+                            <button type="submit" class="btn-primary">Update Keycloak Roles</button>
+                        }
+                        else
+                        {
+                            <p class="text-muted">No Keycloak roles available.</p>
+                        }
                     </form>
                 </div>
 
@@ -227,6 +293,17 @@
 
     .status-active { background: #d4edda; color: #155724; }
     .status-inactive { background: #f8d7da; color: #721c24; }
+
+    .keycloak-role-badge {
+        display: inline-block;
+        padding: 0.4rem 0.8rem;
+        background: #e7f3ff;
+        color: #0056b3;
+        border: 1px solid #b3d9ff;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
 </style>
 
 

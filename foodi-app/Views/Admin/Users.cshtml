@@ -21,7 +21,8 @@
                         <th>Username</th>
                         <th>Email</th>
                         <th>Name</th>
-                        <th>Role</th>
+                        <th>Foodi Role</th>
+                        <th>Keycloak Roles</th>
                         <th>Status</th>
                         <th>Synced</th>
                         <th>Created</th>
@@ -39,6 +40,21 @@
                                 <span class="role-badge role-@user.Roles.ToLower()">
                                     @string.Join(", ", user.GetRoles().Select(r => r.GetDisplayName()))
                                 </span>
+                            </td>
+                            <td>
+                                @if (user.GetKeycloakRoles().Any())
+                                {
+                                    <div style="display: flex; flex-wrap: wrap; gap: 0.25rem;">
+                                        @foreach (var role in user.GetKeycloakRoles())
+                                        {
+                                            <span class="keycloak-role-badge-small">@role</span>
+                                        }
+                                    </div>
+                                }
+                                else
+                                {
+                                    <span style="color: #95a5a6; font-size: 0.85rem;">—</span>
+                                }
                             </td>
                             <td>
                                 @if (user.IsActive)
@@ -150,6 +166,17 @@
         padding: 3rem;
         text-align: center;
         color: #7f8c8d;
+    }
+
+    .keycloak-role-badge-small {
+        display: inline-block;
+        padding: 0.2rem 0.5rem;
+        background: #e7f3ff;
+        color: #0056b3;
+        border: 1px solid #b3d9ff;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 500;
     }
 </style>
 

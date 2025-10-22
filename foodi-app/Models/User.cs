@@ -33,9 +33,16 @@ public class User
     public string? KeycloakUserId { get; set; }
     
     /// <summary>
-    /// Comma-separated list of user roles (e.g., "Agent", "Agent,Lead")
+    /// Comma-separated list of Foodi internal roles (e.g., "Agent", "Agent,Lead")
+    /// Controls application permissions
     /// </summary>
     public string Roles { get; set; } = "Agent";
+    
+    /// <summary>
+    /// Comma-separated list of Keycloak roles (e.g., "agent", "lead,admin")
+    /// Synced to Keycloak, separate from Foodi roles
+    /// </summary>
+    public string? KeycloakRoles { get; set; }
     
     /// <summary>
     /// Check if user has a specific role
@@ -105,6 +112,47 @@ public class User
     public List<string> GetRoleNames()
     {
         return GetRoles().Select(r => r.ToString()).ToList();
+    }
+    
+    /// <summary>
+    /// Get list of Keycloak roles
+    /// </summary>
+    public List<string> GetKeycloakRoles()
+    {
+        if (string.IsNullOrWhiteSpace(KeycloakRoles))
+        {
+            return new List<string>();
+        }
+        
+        return KeycloakRoles
+            .Split(',', StringSplitOptions.RemoveEmptyEntries)
+            .Select(r => r.Trim())
+            .Where(r => !string.IsNullOrWhiteSpace(r))
+            .ToList();
+    }
+    
+    /// <summary>
+    /// Set Keycloak roles (replaces existing Keycloak roles)
+    /// </summary>
+    public void SetKeycloakRoles(List<string> roles)
+    {
+        if (roles == null || !roles.Any())
+        {
+            KeycloakRoles = null;
+        }
+        else
+        {
+            KeycloakRoles = string.Join(",", roles.Select(r => r.Trim().ToLower()));
+        }
+    }
+    
+    /// <summary>
+    /// Check if user has a specific Keycloak role
+    /// </summary>
+    public bool HasKeycloakRole(string role)
+    {
+        var keycloakRoles = GetKeycloakRoles();
+        return keycloakRoles.Contains(role.ToLower());
     }
 }
 

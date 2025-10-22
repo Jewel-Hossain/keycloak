@@ -73,9 +73,15 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("AuthenticatedUser", policy => policy.RequireAuthenticatedUser());
 });
 
+// Add memory cache for role caching
+builder.Services.AddMemoryCache();
+
 // Register Keycloak Sync Service
 builder.Services.AddHttpClient<KeycloakSyncService>();
 builder.Services.AddScoped<KeycloakSyncService>();
+
+// Register Role Service
+builder.Services.AddScoped<RoleService>();
 
 // Add session support
 builder.Services.AddSession(options =>

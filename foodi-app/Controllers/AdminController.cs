@@ -12,15 +12,18 @@ public class AdminController : Controller
 {
     private readonly ApplicationDbContext _context;
     private readonly KeycloakSyncService _keycloakSync;
+    private readonly RoleService _roleService;
     private readonly ILogger<AdminController> _logger;
 
     public AdminController(
         ApplicationDbContext context,
         KeycloakSyncService keycloakSync,
+        RoleService roleService,
         ILogger<AdminController> logger)
     {
         _context = context;
         _keycloakSync = keycloakSync;
+        _roleService = roleService;
         _logger = logger;
     }
 
@@ -64,6 +67,11 @@ public class AdminController : Controller
             TempData["Error"] = "User not found.";
             return RedirectToAction(nameof(Users));
         }
+
+        // Fetch available roles for display
+        var (foodiRoles, keycloakRoles) = await _roleService.GetAllRolesAsync();
+        ViewBag.FoodiRoles = foodiRoles;
+        ViewBag.AvailableKeycloakRoles = keycloakRoles;
 
         return View(user);
     }
@@ -150,6 +158,51 @@ public class AdminController : Controller
         }
 
         TempData["Success"] = $"User {user.Username} role updated to {role.Value.GetDisplayName()}.";
+        return RedirectToAction(nameof(UserDetails), new { id });
+    }
+
+    /// <summary>
+    /// Update user's Keycloak roles (Head only)
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [Authorize(Policy = "HeadOnly")]
+    public async Task<IActionResult> UpdateUserKeycloakRoles(int id, List<string>? selectedKeycloakRoles)
+    {
+        var user = await _context.Users.FindAsync(id);
+        if (user == null)
+        {
+            TempData["Error"] = "User not found.";
+            return RedirectToAction(nameof(Users));
+        }
+
+        // Update user's Keycloak roles
+        user.SetKeycloakRoles(selectedKeycloakRoles ?? new List<string>());
+        user.LastModifiedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        // Sync to Keycloak
+        if (!string.IsNullOrEmpty(user.KeycloakUserId))
+        {
+            try
+            {
+                var keycloakRoles = user.GetKeycloakRoles();
+                await _keycloakSync.SyncUserKeycloakRolesAsync(user.KeycloakUserId, keycloakRoles);
+                _logger.LogInformation($"User {user.Username} Keycloak roles updated to: {string.Join(", ", keycloakRoles)}");
+                TempData["Success"] = $"Keycloak roles updated successfully for {user.Username}.";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error syncing Keycloak roles to Keycloak");
+                TempData["Warning"] = "Keycloak roles updated in database, but sync to Keycloak failed.";
+            }
+        }
+        else
+        {
+            TempData["Success"] = $"Keycloak roles updated for {user.Username} (not yet synced to Keycloak).";
+        }
+
         return RedirectToAction(nameof(UserDetails), new { id });
     }
 

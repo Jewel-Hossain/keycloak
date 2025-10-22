@@ -33,8 +33,11 @@ public class RegisterViewModel
     [Display(Name = "Last Name")]
     public string LastName { get; set; } = string.Empty;
     
-    [Display(Name = "Account Type")]
+    [Display(Name = "Foodi Role")]
     public string? SelectedRole { get; set; }
+    
+    [Display(Name = "Keycloak Roles")]
+    public List<string>? SelectedKeycloakRoles { get; set; }
     
     /// <summary>
     /// Get the selected role as Role enum, defaulting to Agent
@@ -47,6 +50,14 @@ public class RegisterViewModel
         }
         
         return RoleExtensions.ParseRole(SelectedRole) ?? Role.Agent;
+    }
+    
+    /// <summary>
+    /// Get the selected Keycloak roles, or empty list if none selected
+    /// </summary>
+    public List<string> GetSelectedKeycloakRoles()
+    {
+        return SelectedKeycloakRoles ?? new List<string>();
     }
 }
 

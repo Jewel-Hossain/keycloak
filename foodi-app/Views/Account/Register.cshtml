@@ -40,16 +40,63 @@
                 <span asp-validation-for="Email" class="text-danger"></span>
             </div>
 
-            <div class="form-group">
-                <label asp-for="SelectedRole" class="form-label"></label>
-                <select asp-for="SelectedRole" class="form-control">
-                    <option value="Agent">Agent (Default - Basic Features)</option>
-                    <option value="Lead">Lead (Team Management)</option>
-                    <option value="Admin">Administrator (Admin Features)</option>
-                    <option value="Head">Head (Full System Access)</option>
-                </select>
-                <span asp-validation-for="SelectedRole" class="text-danger"></span>
-                <small class="form-text text-muted">Select your account type. Defaults to Agent if not selected.</small>
+            <!-- Foodi Internal Role -->
+            <div class="role-section">
+                <div class="role-section-header">
+                    <h3>🎭 Foodi Role</h3>
+                    <small>Controls your permissions within Foodi app</small>
+                </div>
+                <div class="form-group">
+                    <label asp-for="SelectedRole" class="form-label"></label>
+                    <select asp-for="SelectedRole" class="form-control">
+                        @if (ViewBag.FoodiRoles != null)
+                        {
+                            @foreach (var role in ViewBag.FoodiRoles)
+                            {
+                                <option value="@role.Value">@role.Name - @role.Description</option>
+                            }
+                        }
+                        else
+                        {
+                            <option value="Agent">Agent - Standard user with basic features</option>
+                            <option value="Lead">Lead - Team management and advanced features</option>
+                            <option value="Admin">Admin - Administrative features and reporting</option>
+                            <option value="Head">Head - Full system access and user management</option>
+                        }
+                    </select>
+                    <span asp-validation-for="SelectedRole" class="text-danger"></span>
+                </div>
+            </div>
+
+            <!-- Keycloak Roles -->
+            <div class="role-section">
+                <div class="role-section-header">
+                    <h3>🔐 Keycloak Roles</h3>
+                    <small>Additional roles synced to Keycloak (optional, multi-select)</small>
+                </div>
+                <div class="form-group">
+                    @if (ViewBag.KeycloakRoles != null && ViewBag.KeycloakRoles.Count > 0)
+                    {
+                        <div class="checkbox-group">
+                            @foreach (var role in ViewBag.KeycloakRoles)
+                            {
+                                <div class="checkbox-item">
+                                    <input type="checkbox" 
+                                           name="SelectedKeycloakRoles" 
+                                           value="@role.Value" 
+                                           id="keycloak_@role.Value" />
+                                    <label for="keycloak_@role.Value">
+                                        <strong>@role.Name</strong> - @role.Description
+                                    </label>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted">No Keycloak roles available. Make sure Keycloak is running and roles are created.</p>
+                    }
+                </div>
             </div>
 
             <div class="form-group">
